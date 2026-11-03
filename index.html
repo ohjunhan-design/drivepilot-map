@@ -35,7 +35,7 @@
 function $(i){return document.getElementById(i)}
 function param(n){var m=location.hash.replace(/^#/,'').split('&');for(var i=0;i<m.length;i++){var p=m[i].split('=');if(p[0]===n)return decodeURIComponent(p[1]||'')}return ''}
 // 주소에 &k=키 가 있으면 그 키를 쓴다(다른 사람이 자기 카카오 키로 쓸 수 있게).
-var KAKAO_KEY = param('k') || '05168d92e41f949b9e852f509b58fe9d';
+var KAKAO_KEY = param('k') || 'a3412d3b91b0eca2c0ffd4e396792c31';
 var DB = param('db').replace(/\/$/,''), ID = param('id');
 if(DB && ID){ $('msg').style.display='none'; }
 
