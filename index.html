@@ -39,6 +39,7 @@ var KAKAO_KEY = param('k') || 'a3412d3b91b0eca2c0ffd4e396792c31';
 // 저장소 주소는 기본값을 페이지에 넣어 두었다(개인용). 주소 끝에 #비밀문자열 만 붙이면 열린다.
 var DEFAULT_DB = 'https://drivepilot-oj-live-default-rtdb.asia-southeast1.firebasedatabase.app';
 var raw = location.hash.replace(/^#/,'');
+if(raw==='reset'){ try{localStorage.clear()}catch(e){} raw=''; }      // 주소 끝에 #reset 을 붙이면 연결을 처음부터 다시 한다
 var DB = param('db'), ID = param('id');
 if(!DB && !ID && raw && raw.indexOf('=')<0) ID = raw;          // 짧은 주소: #비밀문자열
 try{                                                              // 한 번 열면 브라우저가 기억한다
@@ -46,7 +47,24 @@ try{                                                              // 한 번 열
   else { ID = localStorage.getItem('dp_id') || ''; DB = DB || localStorage.getItem('dp_db') || ''; }
 }catch(e){}
 DB = (DB || DEFAULT_DB).replace(/\/$/,'');
-if(DB && ID){ $('msg').style.display='none'; }
+// ---- 연결(페어링): 테슬라에서 긴 주소를 치지 않도록, 이 페이지가 코드를 보여 주고 폰이 그 코드를 입력한다 ----
+var CODE='', PAIRED=false;
+try{ PAIRED = localStorage.getItem('dp_paired')==='1'; CODE = localStorage.getItem('dp_code')||''; }catch(e){}
+if(param('id') || (raw && raw.indexOf('=')<0)){ PAIRED = true; try{localStorage.setItem('dp_paired','1')}catch(e){} }   // 예전 방식 주소
+function rnd(n){ var a=new Uint32Array(n); (window.crypto||window.msCrypto).getRandomValues(a); return a }
+function genId(){ var c='abcdefghijklmnopqrstuvwxyz0123456789', r=rnd(16), t=''; for(var i=0;i<16;i++) t+=c[r[i]%36]; return t }
+function genCode(){ return String(10000000 + rnd(1)[0] % 90000000) }
+function showPair(){
+  $('msg').style.display='flex';
+  $('msg').innerHTML = '폰 앱 → 설정 → 테슬라 지도 화면 → <b>연결 코드</b>에<br>아래 숫자를 입력하고 "연결"을 누르세요<br><span style="font-size:min(13vmin,100px);font-weight:700;letter-spacing:.08em">'+CODE.replace(/^(\d{4})(\d{4})$/,'$1 $2')+'</span>';
+}
+function startPairing(){
+  if(!ID){ ID = genId(); try{ localStorage.setItem('dp_id', ID) }catch(e){} }
+  if(!CODE){ CODE = genCode(); try{ localStorage.setItem('dp_code', CODE) }catch(e){} }
+  fetch(DB+'/pair/'+CODE+'.json', {method:'PUT', body:JSON.stringify({id:ID, t:Date.now()})}).catch(function(){});
+  showPair();
+}
+if(PAIRED){ $('msg').style.display='none'; } else { startPairing(); }
 
 var state = {}, last = 0, map, car, cam, polyline;
 
@@ -107,7 +125,13 @@ function render(){
 function apply(path, data){
   if(path==='/' ){ state = (data && typeof data==='object') ? data : {}; }
   else { var parts = path.replace(/^\//,'').split('/'); var o = state; for(var i=0;i<parts.length-1;i++){ o[parts[i]] = o[parts[i]]||{}; o = o[parts[i]] } o[parts[parts.length-1]] = data; }
-  last = Date.now(); render();
+  last = Date.now();
+  if(!PAIRED && state && (state.on===1 || state.on===0)){
+    PAIRED = true; try{ localStorage.setItem('dp_paired','1') }catch(e){}
+    $('msg').style.display='none';
+    fetch(DB+'/pair/'+CODE+'.json', {method:'DELETE'}).catch(function(){});
+  }
+  render();
 }
 function stream(){
   var url = DB + '/live/' + ID + '.json';
